@@ -19,28 +19,43 @@
     </div>
 
     <script>
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzjuN8XFAleeYRpnah2YLeMyxicfV-SCdQGDgWxPlSAUTRt5NyUYr4w2i7cLRkbuOwrcw/exec"; 
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwNMu5Evilg19d-Sm2zF_0e_ReP9Krjzdc7RFePBJ7lSKZYdtzaCY9ov5O70sxa3aASbw/exec"; 
+    const statusDiv = document.getElementById('status');
+    let isProcessing = false;
 
-        function onScanSuccess(decodedText) {
-            document.getElementById('status').innerHTML = "✅ Scanned: " + decodedText;
-            
-            fetch(SCRIPT_URL, {
-                method: "POST",
-                mode: "no-cors", 
-                body: JSON.stringify({ id: decodedText })
-            }).then(() => {
-                document.getElementById('status').innerHTML = "✅ Logged to Sheet!";
-                setTimeout(() => { document.getElementById('status').innerHTML = "Ready for next scan"; }, 3000);
-            });
-        }
-
-        // Fix: Use the standard initialization without extra parameters
-        const html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-            fps: 10, 
-            qrbox: 250 
-        });
+    function onScanSuccess(decodedText) {
+        if (isProcessing) return; // Ignore multiple reads while processing
+        isProcessing = true;
         
-        html5QrcodeScanner.render(onScanSuccess);
-    </script>
+        // 1. Pause the scanner visually
+        statusDiv.innerHTML = "Processing... Please wait.";
+        statusDiv.className = "";
+
+        // 2. Send data using a GET request (Cleaner for Google Apps Script redirects)
+        // We use a trick to bypass CORS by using a hidden image or simple fetch
+        fetch(SCRIPT_URL + "?id=" + decodedText)
+        .then(response => response.json())
+        .then(data => {
+            statusDiv.innerHTML = data.message;
+            statusDiv.className = data.status === "success" ? "success" : "error";
+            
+       
+            setTimeout(() => {
+                isProcessing = false;
+                statusDiv.innerHTML = "Ready for next scan";
+                statusDiv.className = "";
+            }, 5000);
+        })
+        .catch(err => {
+            // Because of CORS, the catch might trigger even if it works. 
+            // If it logs to your sheet, it worked!
+            statusDiv.innerHTML = "Check Sheet for Status";
+            setTimeout(() => { isProcessing = false; }, 3000);
+        });
+    }
+
+    const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+    html5QrcodeScanner.render(onScanSuccess);
+</script>
 </body>
 </html>
